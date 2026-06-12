@@ -26,6 +26,7 @@
     "garage_update_error": "There was an error while trying to update garage, please contact support",
     "garage_deleted": "Garage has been successfully deleted.",
     "garage_deleted_error": "There was an error trying to delete garage, please contact support",
+    "max_jobs_reached": "The maximum number of jobs has been reached",
     "no_vehicles": "No available vehicles for this job",
     "open_garage": "Garage",
     "return_vehicle": "Return vehicle"

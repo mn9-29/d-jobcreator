@@ -142,6 +142,13 @@ RegisterNetEvent('d-jobcreator:addJob', function(data)
         return Framework.Notify(src, 'error', locale('locations_invalid'))
     end
 
+    if Config.MaxJobs and Config.MaxJobs > 0 then
+        local count = MySQL.scalar.await('SELECT COUNT(*) FROM jobs')
+        if count and count >= Config.MaxJobs then
+            return Framework.Notify(src, 'error', locale('max_jobs_reached'))
+        end
+    end
+
     local exists = MySQL.scalar.await(
         'SELECT COUNT(*) FROM jobs WHERE name = ? OR label = ?', { jobName, label }
     )

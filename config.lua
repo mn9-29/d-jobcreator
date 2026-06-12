@@ -30,6 +30,10 @@ Config.ActionCooldown = 0.5
 -- Print extra debug info to the server/client console.
 Config.Debug = false
 
+-- Maximum number of jobs admins can create through the UI.
+-- 0 = unlimited. Set a value to protect against abuse / performance issues.
+Config.MaxJobs = 0
+
 -- ┌─────────────────────────────────────────────────────────────┐
 -- │ NOTIFICATIONS                                                │
 -- └─────────────────────────────────────────────────────────────┘

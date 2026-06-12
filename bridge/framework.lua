@@ -122,17 +122,27 @@ if isServer then
     end
 
     -- Build a framework-native jobs table from the DB rows.
+    -- Uses exactly TWO queries regardless of job count (no N+1).
     local function buildJobsTable(flavor)
         local jobs = {}
         local jobRows = MySQL.query.await('SELECT name, label FROM jobs') or {}
-        for _, j in ipairs(jobRows) do
-            local gradeRows = MySQL.query.await(
-                'SELECT grade, name, label, salary FROM job_grades WHERE job_name = ? ORDER BY grade ASC',
-                { j.name }
-            ) or {}
+        if #jobRows == 0 then return jobs end
 
+        local gradeRows = MySQL.query.await(
+            'SELECT job_name, grade, name, label, salary FROM job_grades ORDER BY grade ASC'
+        ) or {}
+
+        -- Group grades by job name in a single pass.
+        local gradesByJob = {}
+        for _, g in ipairs(gradeRows) do
+            local list = gradesByJob[g.job_name]
+            if not list then list = {}; gradesByJob[g.job_name] = list end
+            list[#list + 1] = g
+        end
+
+        for _, j in ipairs(jobRows) do
             local grades = {}
-            for _, g in ipairs(gradeRows) do
+            for _, g in ipairs(gradesByJob[j.name] or {}) do
                 local key = flavor == 'qbcore' and tostring(g.grade) or tonumber(g.grade)
                 grades[key] = {
                     name = g.label or g.name or ('grade ' .. tostring(g.grade)),
