@@ -25,5 +25,8 @@
     "garage_updated": "Garage has been updated successfully",
     "garage_update_error": "There was an error while trying to update garage, please contact support",
     "garage_deleted": "Garage has been successfully deleted.",
-    "garage_deleted_error": "There was an error trying to delete garage, please contact support"
+    "garage_deleted_error": "There was an error trying to delete garage, please contact support",
+    "no_vehicles": "No available vehicles for this job",
+    "open_garage": "Garage",
+    "return_vehicle": "Return vehicle"
   }
