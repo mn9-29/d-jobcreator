@@ -1,59 +1,48 @@
 local stashLocations = {}
+local stashObjects = {}
 
-RegisterNetEvent('stash:updateStashes')
- AddEventHandler('stash:updateStashes', function(stashes)
-    stashLocations = stashes
-    SpawnStashObjects(stashes)
-end)
-
-function GetPlayerJob()
-    return ESX.GetPlayerData().job.name
-end
-
-local stashObjects = {} 
-
-function SpawnStashObjects()
+local function SpawnStashObjects()
     for _, obj in ipairs(stashObjects) do
         if DoesEntityExist(obj) then
             DeleteEntity(obj)
         end
     end
-    
-    stashObjects = {} 
+    stashObjects = {}
+
+    local stashModel = `prop_ld_int_safe_01`
 
     for _, stash in ipairs(stashLocations) do
-        print(stash)
-        local stashModel = `prop_ld_int_safe_01` 
         RequestModel(stashModel)
+        local started = GetGameTimer()
         while not HasModelLoaded(stashModel) do
-            Wait(100)
+            Wait(0)
+            if GetGameTimer() - started > 10000 then break end
         end
 
-        local stashObject = CreateObject(stashModel, stash.coords.x, stash.coords.y, stash.coords.z - 1.0, false, false, false)
-        SetEntityHeading(stashObject, 0.0)
-        FreezeEntityPosition(stashObject, true)
+        local obj = CreateObject(stashModel, stash.coords.x, stash.coords.y, stash.coords.z - 1.0, false, false, false)
+        if DoesEntityExist(obj) then
+            SetEntityHeading(obj, 0.0)
+            FreezeEntityPosition(obj, true)
+            stashObjects[#stashObjects + 1] = obj
 
-        if DoesEntityExist(stashObject) then
-            print('Entity exists')
-            table.insert(stashObjects, stashObject) 
-        else
-            print('Entity does not exist')
-            DeleteEntity(stashObject)
+            exports.ox_target:addLocalEntity(obj, {
+                {
+                    label = 'Open stash',
+                    icon = 'fa-solid fa-box-open',
+                    onSelect = function()
+                        if Framework.GetJobName() == stash.job then
+                            exports.ox_inventory:openInventory('stash', stash.id)
+                        end
+                    end,
+                },
+            })
         end
-
-        exports.ox_target:addLocalEntity(stashObject, {
-            {
-                label = "Open stash",
-                icon = "fa-solid fa-box-open",
-                onSelect = function()
-                    local playerJob = GetPlayerJob()
-                    if playerJob == stash.job then
-                        exports.ox_inventory:openInventory('stash', stash.id)
-                    else
-                        return false
-                    end
-                end
-            }
-        })
     end
+
+    SetModelAsNoLongerNeeded(stashModel)
 end
+
+RegisterNetEvent('stash:updateStashes', function(data)
+    stashLocations = data or {}
+    SpawnStashObjects()
+end)

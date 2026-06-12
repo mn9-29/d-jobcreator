@@ -2,485 +2,361 @@ lib.locale()
 
 local nuiVisible = false
 
-function openJobManager()
+local function openJobManager()
     if not nuiVisible then
         SetNuiFocus(true, true)
-        SendNUIMessage({ action = "open" })
+        SendNUIMessage({ action = 'open' })
         nuiVisible = true
     end
 end
 
-function closeJobManager()
+local function closeJobManager()
     if nuiVisible then
         SetNuiFocus(false, false)
-        SendNUIMessage({ action = "close" })
+        SendNUIMessage({ action = 'close' })
         nuiVisible = false
     end
 end
 
-
-RegisterCommand(Config.openJobCreator, function(source, args, rawCommand)
-    local playerData = ESX.GetPlayerData()
-    local allowed = false
-
-    for _, group in ipairs(Config.AllowedGroups) do
-        if playerData.group == group then
-            allowed = true
-            break
-        end
-    end
-
-    if allowed then
-        TriggerServerEvent('d-jobcreator:requestJobsList')
-        openJobManager()
-    else
-        sendNotification('error', locale('no_permissions'), 3000)
-        return false
-    end
+-- ─────────────────────────────────────────────────────────────
+-- Opening the creator (permission is verified SERVER-SIDE)
+-- ─────────────────────────────────────────────────────────────
+RegisterCommand(Config.openJobCreator, function()
+    TriggerServerEvent('d-jobcreator:openRequest')
 end, false)
 
-RegisterNUICallback('close', function(data, cb)
+RegisterNetEvent('d-jobcreator:openUI', function(jobs)
+    openJobManager()
+    SendNUIMessage({ type = 'jobsList', jobs = jobs })
+end)
+
+RegisterNUICallback('close', function(_, cb)
     closeJobManager()
     cb('ok')
 end)
 
+-- ─────────────────────────────────────────────────────────────
+-- Notifications
+-- ─────────────────────────────────────────────────────────────
+RegisterNetEvent('d-jobcreator:notify', function(msgType, message, duration)
+    Framework.Notify(msgType, message, duration)
+end)
+
+-- Kept for backwards compatibility with the built-in NUI notifications.
+RegisterNetEvent('showNotification', function(msgType, message, duration)
+    Framework.Notify(msgType, message, duration)
+end)
+
+-- ─────────────────────────────────────────────────────────────
+-- Jobs / grades NUI callbacks
+-- ─────────────────────────────────────────────────────────────
+RegisterNetEvent('d-jobcreator:receiveJobsList', function(jobs)
+    SendNUIMessage({ type = 'jobsList', jobs = jobs })
+end)
+
+RegisterNUICallback('getJobsList', function(_, cb)
+    TriggerServerEvent('d-jobcreator:requestJobsList')
+    cb('ok')
+end)
+
 RegisterNUICallback('addJob', function(data, cb)
-    playerSource = source
-    TriggerServerEvent('d-jobcreator:addJob', data) 
-    cb({ status = "ok" })
+    TriggerServerEvent('d-jobcreator:addJob', data)
+    cb({ status = 'ok' })
 end)
 
-RegisterNUICallback('addJobGrade', function(data, cb)
-    playerSource = source
-    TriggerServerEvent('d-jobcreator:addJobGrade', data) 
-    cb({ status = "ok" })
-end)
-
-
-RegisterNetEvent('d-jobcreator:receiveJobsList')
-AddEventHandler('d-jobcreator:receiveJobsList', function(jobs)
-    SendNUIMessage({
-        type = 'jobsList',
-        jobs = jobs
-    })
+RegisterNUICallback('deleteJob', function(data, cb)
+    TriggerServerEvent('d-jobcreator:deleteJob', data.job_name)
+    cb('success')
 end)
 
 RegisterNUICallback('getJobGrades', function(data, cb)
-    local jobName = data.jobName 
-    TriggerServerEvent('d-jobcreator:getJobGrades', jobName)
+    TriggerServerEvent('d-jobcreator:getJobGrades', data.jobName)
     cb('ok')
 end)
 
-RegisterNetEvent('d-jobcreator:receiveJobGrades')
-AddEventHandler('d-jobcreator:receiveJobGrades', function(grades)
-    SendNUIMessage({
-        type = 'jobGrades',
-        grades = grades
-    })
+RegisterNetEvent('d-jobcreator:receiveJobGrades', function(grades)
+    SendNUIMessage({ type = 'jobGrades', grades = grades })
+end)
+
+RegisterNUICallback('addJobGrade', function(data, cb)
+    TriggerServerEvent('d-jobcreator:addJobGrade', data)
+    cb({ status = 'ok' })
 end)
 
 RegisterNUICallback('updateJobGrades', function(data, cb)
-    local playerSource = source
     if data and data.data then
         TriggerServerEvent('d-jobcreator:updateJobGrades', data.data)
-    else
-        print("ERROR: No data received from NUI")
     end
     cb('ok')
 end)
 
-
-
 RegisterNUICallback('deleteJobGrade', function(data, cb)
-    playerSource = source
     TriggerServerEvent('d-jobcreator:deleteJobGrade', data.job_name, data.grade)
-    cb("success")
+    cb('success')
 end)
 
-
-RegisterNUICallback('deleteJob', function(data, cb)
-    playerSource = source
-    TriggerServerEvent('d-jobcreator:deleteJob', data.job_name)
-    cb("success")
+-- ─────────────────────────────────────────────────────────────
+-- Garages NUI callbacks
+-- ─────────────────────────────────────────────────────────────
+RegisterNetEvent('d-jobcreator:receiveGarages', function(garages)
+    SendNUIMessage({ type = 'loadGarages', garages = garages })
 end)
 
-function sendNotification(type, message, duration)
-    if Config.NotificationSystem == "djonza" then
-    showNotification(type, message, duration)
-     elseif Config.NotificationSystem == "ox_lib" then
-        exports['ox_lib']:notify({
-            title = title, 
-            description = message,
-            type = type,           
-        })
-    elseif Config.NotificationSystem == "esx" then
-        ESX.ShowNotification(message)
-    elseif Config.NotificationSystem == "custom" then
-        TriggerEvent('your_custom_notify', message)
-    else
-        print("Unknown notification system!")
-        end
-    end
-
-    RegisterNetEvent("sendNotificationClient")
-    AddEventHandler("sendNotificationClient", function(type, message, duration)
-        sendNotification(type, message, duration)
-    end)
-
-RegisterNetEvent('showNotification')
-AddEventHandler('showNotification', function(type, message, duration)
-    SendNUIMessage({
-        action = 'showNotification',
-        type = type,
-        message = message,
-        duration = duration,
-    })
-end)
-
-
-function showNotification(type, message, duration)
-    SendNUIMessage({
-        action = 'showNotification',
-        type = type,
-        message = message,
-        duration = duration
-    })
-end
-
-RegisterNetEvent('d-jobcreator:receiveGarages')
-AddEventHandler('d-jobcreator:receiveGarages', function(garages)
-    SendNUIMessage({
-        type = "loadGarages", 
-        garages = garages
-    })
-end)
-
-
-RegisterNUICallback("getGaragesForJob", function(data, cb)
-    local jobName = data.jobName 
-  TriggerServerEvent('garage:getGaragesForJob', jobName) 
+RegisterNUICallback('getGaragesForJob', function(data, cb)
+    TriggerServerEvent('garage:getGaragesForJob', data.jobName)
+    cb('ok')
 end)
 
 RegisterNUICallback('addNewGarage', function(data, cb)
-    local playerSource = source
     TriggerServerEvent('garage:addNewGarage', data)
-    cb({ success = true, message = 'Garage has been aded!' })
-    TriggerServerEvent('reloadgarages', jobName)
+    cb({ success = true })
 end)
 
-
-RegisterNUICallback("updateGarage", function(data, cb)
-    local playerSource = source
+RegisterNUICallback('updateGarage', function(data, cb)
     if not data.id then
-        print(data.id)
-        print("❌ ERROR: Garage id invalid!")
-        return cb({ success = false, message = "Invalid garage id!" })
+        return cb({ success = false, message = 'Invalid garage id!' })
     end
-
-    TriggerServerEvent("d-jobcreator:updateGarage", data)
-    cb({ success = true, message = "Podaci poslati serveru." })
+    TriggerServerEvent('d-jobcreator:updateGarage', data)
+    cb({ success = true })
 end)
 
 RegisterNUICallback('deleteGarage', function(data, cb)
-    local playerSource = source
-    local jobName = data.job 
-    TriggerServerEvent('d-jobcreator:deleteGarage', data.id, jobName)
-    TriggerServerEvent('reloadgarages', jobName)
-    cb("success")
+    TriggerServerEvent('d-jobcreator:deleteGarage', data.id, data.job)
+    cb('success')
 end)
 
-
-
-RegisterNUICallback("getStashLocation", function(data, cb)
-    local jobName = data.jobName
-    print(jobName)
-    TriggerServerEvent("d-jobcreator:getStashLocation", jobName)
-    cb({ success = true, message = "Podaci poslati serveru." })
+-- ─────────────────────────────────────────────────────────────
+-- Stash NUI callbacks
+-- ─────────────────────────────────────────────────────────────
+RegisterNUICallback('getStashLocation', function(data, cb)
+    TriggerServerEvent('d-jobcreator:getStashLocation', data.jobName)
+    cb({ success = true })
 end)
 
-RegisterNetEvent("d-jobcreator:receiveStashLocation")
-AddEventHandler("d-jobcreator:receiveStashLocation", function(stashLocation, stashCapacity, stashSlots)
+RegisterNetEvent('d-jobcreator:receiveStashLocation', function(stashLocation, stashCapacity, stashSlots)
     if stashLocation then
         SendNUIMessage({
-            action = "setStashLocation", 
+            action = 'setStashLocation',
             location = stashLocation,
             capacity = stashCapacity,
-            slots = stashSlots
+            slots = stashSlots,
         })
-    else
-        print("Stash location not found for this job.")
     end
 end)
 
-RegisterNUICallback("updateStash", function(data, cb)
-    local playerSOurce = source
-    local jobName = data.jobName
-    print(jobName)
-    TriggerServerEvent("d-jobcreator:updateStashLocation", data)
-    TriggerServerEvent('d-jobcreator:loadjobstashes')
-    cb({ success = true, message = "Podaci poslati serveru." })
+RegisterNUICallback('updateStash', function(data, cb)
+    TriggerServerEvent('d-jobcreator:updateStashLocation', data)
+    cb({ success = true })
 end)
 
-local npcEntity = nil
-
-
+-- ─────────────────────────────────────────────────────────────
+-- Garage world entities (NPCs) + ox_target zones
+-- ─────────────────────────────────────────────────────────────
 local function decodeCoordinates(coordString)
-    local coords = {}
-    for v in string.gmatch(coordString, "([-?%d.]+)") do
-        table.insert(coords, tonumber(v)) 
+    if type(coordString) == 'table' then
+        return vector3(coordString.x + 0.0, coordString.y + 0.0, coordString.z + 0.0)
     end
-    return vector3(coords[1], coords[2], coords[3])  
+    local coords = {}
+    for v in string.gmatch(coordString, '([-?%d.]+)') do
+        coords[#coords + 1] = tonumber(v)
+    end
+    return vector3(coords[1], coords[2], coords[3])
 end
 
 local function createNPC(location)
     RequestModel(Config.npcModel)
+    local started = GetGameTimer()
     while not HasModelLoaded(Config.npcModel) do
-        Wait(100)
+        Wait(0)
+        if GetGameTimer() - started > 10000 then return nil end
     end
     local npc = CreatePed(4, Config.npcModel, location.x, location.y, location.z - 1.0, 0.0, false, true)
-    SetEntityInvincible(npc, true) 
-    FreezeEntityPosition(npc, true) 
-    SetBlockingOfNonTemporaryEvents(npc, true) 
-
-    return npc 
+    SetEntityInvincible(npc, true)
+    FreezeEntityPosition(npc, true)
+    SetBlockingOfNonTemporaryEvents(npc, true)
+    SetModelAsNoLongerNeeded(Config.npcModel)
+    return npc
 end
 
 local garages = {}
 
-RegisterNetEvent('d-jobcreator:loadGarages')
-AddEventHandler('d-jobcreator:loadGarages', function(data)
-    if not data or #data == 0 then
-        print("[GARAGE] Nema garaza u bazi.")
-        return
-    end
+local function clearGarages()
     for _, garage in pairs(garages) do
-        if DoesEntityExist(garage.npc) then
+        if garage.npc and DoesEntityExist(garage.npc) then
             DeleteEntity(garage.npc)
         end
     end
     garages = {}
+end
+
+RegisterNetEvent('d-jobcreator:loadGarages', function(data)
+    if type(data) ~= 'table' or #data == 0 then return end
+
+    clearGarages()
+
     for _, garage in ipairs(data) do
         if garage.location and garage.job then
             local location = decodeCoordinates(garage.location)
+
             local npcExists = false
-            for _, existingGarage in pairs(garages) do
-                if existingGarage.coords and #(existingGarage.coords - location) < 0.5 then
+            for _, existing in pairs(garages) do
+                if existing.coords and #(existing.coords - location) < 0.5 then
                     npcExists = true
                     break
                 end
             end
+
             if not npcExists then
                 local npc = createNPC(location)
-                table.insert(garages, {
-                    id = json.encode(garage.id),
-                    name = json.encode(garage.name),
+                garages[#garages + 1] = {
+                    id = garage.id,
+                    name = garage.name,
                     npc = npc,
                     coords = location,
-                    job = garage.job
-                })
-            else    
-                for _, garage in pairs(garages) do
-                    print("Garage ID:", garage.job)
-                end
-                print('Npc vec postoji na ovoj lokaciji.')
+                    job = garage.job,
+                }
             end
         end
     end
 end)
 
+RegisterNetEvent('d-jobcreator:loadVehicles', function(data)
+    if type(data) ~= 'table' or not data.vehicles then
+        return Framework.Notify('error', locale('no_vehicles'))
+    end
 
+    local decoded = type(data.vehicles) == 'string' and json.decode(data.vehicles) or data.vehicles
+    if type(decoded) ~= 'table' or #decoded == 0 then
+        return Framework.Notify('error', locale('no_vehicles'))
+    end
 
-RegisterNetEvent("d-jobcreator:loadVehicles")
-AddEventHandler("d-jobcreator:loadVehicles", function(data)
-    if data and type(data) == "table" and #data > 0 then
-        local vehiclesJson = data[1].vehicles
+    local options = {}
+    for _, vehicle in ipairs(decoded) do
+        options[#options + 1] = {
+            title = vehicle,
+            description = vehicle,
+            icon = 'car',
+            event = 'd-jobcreator:spawnVehicle',
+            args = { vehicleModel = vehicle, spawnpoint = data.spawn_location },
+        }
+    end
 
-        if vehiclesJson and type(vehiclesJson) == "string" and vehiclesJson ~= "[]" then
-            local decodedVehicles = json.decode(vehiclesJson)
-            if decodedVehicles and type(decodedVehicles) == "table" and #decodedVehicles > 0 then
-                local vehicleList = {}
+    lib.registerContext({ id = 'vehicle_menu', title = 'Vehicles', options = options })
+    lib.showContext('vehicle_menu')
+end)
 
-                for _, vehicle in ipairs(decodedVehicles) do
-                    print("Found vehicle:", vehicle)
+RegisterNetEvent('d-jobcreator:spawnVehicle', function(data)
+    local vehicleModel = data.vehicleModel
+    if not vehicleModel or vehicleModel == '' then
+        return Framework.Notify('error', locale('model_doesnt_exist'))
+    end
 
-                    table.insert(vehicleList, {
-                        title = vehicle,
-                        description = vehicle,
-                        icon = 'car',
-                        event = 'd-jobcreator:spawnVehicle',
-                        args = {
-                            vehicleModel = vehicle,
-                            spawnpoint = data[1].spawn_location 
-                        }
-                    })
-                end
+    local spawnpoint = decodeCoordinates(data.spawnpoint)
+    if IsPedInAnyVehicle(PlayerPedId(), false) then return end
 
-                lib.registerContext({
-                    id = 'vehicle_menu',
-                    title = 'Vehicles',
-                    options = vehicleList,
-                })
+    if not Framework.IsSpawnClear(spawnpoint, 3.0) then
+        return Framework.Notify('error', locale('spawnpoint_not_clear'))
+    end
 
-                lib.showContext('vehicle_menu')
-            else
-                sendNotification("error", "Vehicle list is not valid!", 5000)
-            end
+    local playerPed = PlayerPedId()
+    local heading = GetEntityHeading(playerPed)
+
+    Framework.SpawnVehicle(vehicleModel, spawnpoint, heading, function(vehicle)
+        if vehicle and DoesEntityExist(vehicle) then
+            TaskWarpPedIntoVehicle(playerPed, vehicle, -1)
         else
-            sendNotification("error", "No available vehicles for this job!", 5000)
+            Framework.Notify('error', locale('model_doesnt_exist'))
         end
-    else
-        sendNotification("error", "No available vehicles for this job!", 5000)
-    end
+    end)
 end)
 
+-- ─────────────────────────────────────────────────────────────
+-- Proximity ox_target zone for the player's own garages
+-- ─────────────────────────────────────────────────────────────
 CreateThread(function()
     local playerJob = nil
-    local isNear = false 
-    local currentGarage = nil 
-    local currentZone = nil 
+    local isNear = false
+    local currentGarage = nil
+    local currentZone = nil
 
     while true do
         local sleep = 1000
-        local playerPed = PlayerPedId()
-        local playerCoords = GetEntityCoords(playerPed)
-        local newJob = ESX.GetPlayerData().job.name
-        if newJob ~= playerJob then
-            playerJob = newJob
-        end
+        local playerCoords = GetEntityCoords(PlayerPedId())
+        playerJob = Framework.GetJobName()
 
-        local nearestGarage = nil
-        local nearestDistance = math.huge
-        if #garages > 0 then
-            for _, garage in pairs(garages) do
-                if garage.job == playerJob and garage.coords then
-                    local distance = #(playerCoords - garage.coords)
-                    if distance < nearestDistance then
-                        nearestDistance = distance
-                        nearestGarage = garage
-                    end
+        local nearestGarage, nearestDistance = nil, math.huge
+        for _, garage in pairs(garages) do
+            if garage.job == playerJob and garage.coords then
+                local distance = #(playerCoords - garage.coords)
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearestGarage = garage
                 end
             end
         end
+
         if nearestGarage and nearestDistance < 5.0 then
             if not isNear or currentGarage ~= nearestGarage then
                 isNear = true
                 currentGarage = nearestGarage
-                if currentZone then
-                    exports.ox_target:removeZone(currentZone)
-                end
+                if currentZone then exports.ox_target:removeZone(currentZone) end
+                local garageId = nearestGarage.id
                 currentZone = exports.ox_target:addBoxZone({
                     coords = nearestGarage.coords,
-                    size = vector3(2.0, 2.0, 2.0), 
-                    debugPoly = false,  
+                    size = vector3(2.0, 2.0, 2.0),
+                    rotation = 0.0,
+                    debug = false,
                     options = {
                         {
-                            name = 'open_garage_zone', 
-                            icon = 'fa-solid fa-box-open',  
-                            label = 'Garage',  
+                            name = 'open_garage_zone',
+                            icon = 'fa-solid fa-box-open',
+                            label = locale('open_garage'),
                             onSelect = function()
-                                TriggerServerEvent('d-jobcreator:getVehiclesForJob', playerJob, nearestGarage.id)
-                            end
+                                TriggerServerEvent('d-jobcreator:getVehiclesForJob', garageId)
+                            end,
                         },
                         {
-                            name = 'return_garage_zone', 
-                            icon = 'fa-solid fa-box-open',  
-                            label = 'Return vehicle',  
+                            name = 'return_garage_zone',
+                            icon = 'fa-solid fa-arrow-rotate-left',
+                            label = locale('return_vehicle'),
                             onSelect = function()
-                                local ped = PlayerPedId()
-                                local vehicle = GetVehiclePedIsIn(ped, true)
+                                local vehicle = GetVehiclePedIsIn(PlayerPedId(), false)
                                 if DoesEntityExist(vehicle) then
                                     DeleteEntity(vehicle)
-                                else
-                                    return
                                 end
-                            end                            
-                        }
-                    }
+                            end,
+                        },
+                    },
                 })
             end
-            sleep = 0 
-        else
-            if isNear then
-                if currentZone then
-                    exports.ox_target:removeZone(currentZone)
-                end
-                isNear = false
-                currentGarage = nil
-                currentZone = nil
-            end
+            sleep = 0
+        elseif isNear then
+            if currentZone then exports.ox_target:removeZone(currentZone) end
+            isNear = false
+            currentGarage = nil
+            currentZone = nil
         end
 
         Wait(sleep)
     end
 end)
 
-
-RegisterNetEvent('d-jobcreator:spawnVehicle')
-AddEventHandler('d-jobcreator:spawnVehicle', function(data)
-    local vehicleModel = data.vehicleModel
-    local spawnpoint = decodeCoordinates(data.spawnpoint)
-    print(vehicleModel, spawnpoint)
-
-
-    if not vehicleModel or vehicleModel == "" then
-        lib.notify({
-            title = 'Error',
-            description = 'Nevazeci model vozila!',
-            type = 'error'
-        })
-        return
+-- ─────────────────────────────────────────────────────────────
+-- Refresh garages on load / job change
+-- ─────────────────────────────────────────────────────────────
+local function requestGarages()
+    if Framework.GetJobName() then
+        TriggerServerEvent('reloadgarages')
     end
+end
 
-
-    if not IsModelInCdimage(vehicleModel) or not IsModelAVehicle(vehicleModel) then
-        sendNotification("error", locale('model_doesnt_exist'), 5000)
-        return
-    end
-
-    if IsPedInAnyVehicle(PlayerPedId()) then
-        return
-    end
-
-    local playerPed = PlayerPedId()
-    local heading = GetEntityHeading(playerPed)
-
-    if ESX.Game.IsSpawnPointClear(spawnpoint, 5.0) then
-        ESX.Game.SpawnVehicle(vehicleModel, spawnpoint, heading, function(vehicle)
-            if DoesEntityExist(vehicle) then
-                TaskWarpPedIntoVehicle(playerPed, vehicle, -1)
-            else
-              print('Error while trying to spawn vehicle')
-            end
-        end)
-    else
-        return
-        sendNotification("error", locale('spawnpoint_not_clear'), 5000)
-    end
-end)
-RegisterCommand(Config.reloadGarages, function()
-    if source == 0 then
-    TriggerServerEvent('reloadgarages', jobName)
-    end
-end)
-
-
-AddEventHandler("onResourceStart", function(resourceName)
-    local playerData = ESX.GetPlayerData()
-    if playerData and playerData.job then
+AddEventHandler('onClientResourceStart', function(resourceName)
     if resourceName == GetCurrentResourceName() then
-        TriggerServerEvent('reloadgarages', playerData.job.name)
-        end
+        requestGarages()
     end
 end)
 
-RegisterNetEvent('esx:playerLoaded', function(player, xPlayer, isNew)
-    local playerData = ESX.GetPlayerData()
-    if playerData and playerData.job then
-        TriggerServerEvent('reloadgarages', playerData.job.name)
-        print('Player loaded with job:', playerData.job.name)
-        end
+Framework.OnJobChange(function()
+    clearGarages()
+    requestGarages()
 end)
-
-  
-
-

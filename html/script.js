@@ -205,7 +205,6 @@ function saveJobGrades() {
             updates.push(update);
         }
     });
-    console.log("📤 Sending updates to server:", updates);
     fetch("https://d-jobcreator/updateJobGrades", {
         method: 'POST',
         headers: {
@@ -633,10 +632,7 @@ function openEditMarkers(jobName) {
 }
 
 function loadGarages(garages) {
-    console.log("Loading garages...", garages);
-
-    if (!Array.isArray(garages)) { 
-        console.log("Garages type:", typeof garages);
+    if (!Array.isArray(garages)) {
         return;
     }
 
